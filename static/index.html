@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+      <h1>Add Two Numbers</h1>
+    <input type="number" id="num1"> + <input type="number" id="num2">
+    <button onclick="add()">Add</button>
+    <p id="result"></p>
+
+</div>
+    <script>
+        async function add() {
+            const num1 = document.getElementById("num1").value;
+            const num2 = document.getElementById("num2").value;
+            const response = await fetch(`http://localhost:8001/add?num1=${num1}&num2=${num2}`);
+            const result = await response.json();
+            document.getElementById("result").innerText = `Result: ${result.sum}`;
+        }
+    </script>
+</body>
+</html>
