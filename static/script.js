@@ -22,7 +22,7 @@ function calculate() {
     if (numbers.length < 2) {
         document.getElementById('result').textContent = 'Please enter at least 2 numbers';
         return;
-    }
+   }
 
     // Simple GET request
     fetch(`/api/add?numbers=${numbers.join(',')}`)
@@ -35,3 +35,4 @@ function calculate() {
             console.error(error);
         });
 }
+
