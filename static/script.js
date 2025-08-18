@@ -1,5 +1,4 @@
 let inputCount = 2;
-const toast = new bootstrap.Toast(document.getElementById('notificationToast'));
 
 function addInput() {
     inputCount++;
@@ -9,9 +8,12 @@ function addInput() {
     newInput.placeholder = `Number ${inputCount}`;
     document.getElementById('number-inputs').appendChild(newInput);
     
-    // Show toast notification when 3rd number is added
     if (inputCount === 3) {
-        toast.show();
+        const alertElement = document.getElementById('notificationAlert');
+        alertElement.classList.remove('d-none');
+        setTimeout(() => {
+            alertElement.classList.add('d-none');
+        }, 3000);
     }
 }
 
@@ -22,9 +24,8 @@ function calculate() {
     if (numbers.length < 2) {
         document.getElementById('result').textContent = 'Please enter at least 2 numbers';
         return;
-   }
+    }
 
-    // Simple GET request
     fetch(`/api/add?numbers=${numbers.join(',')}`)
         .then(response => response.json())
         .then(data => {
@@ -35,4 +36,3 @@ function calculate() {
             console.error(error);
         });
 }
-
