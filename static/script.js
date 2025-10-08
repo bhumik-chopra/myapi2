@@ -1,5 +1,6 @@
 let inputCount = 2;
 let calculationHistory = [];
+let currentOperation = 'add';
 
 function addInput() {
     inputCount++;
@@ -64,6 +65,38 @@ function resetInputs() {
     // Reset counter and result
     inputCount = 2;
     document.getElementById('result').textContent = '';
+    currentOperation = 'add';
+    document.getElementById('operationSelect').value = 'add';
+}
+
+function setOperation(operation) {
+    currentOperation = operation;
+    
+    // Update button styles to show active operation
+    const buttons = document.querySelectorAll('.operation-btn');
+    buttons.forEach(btn => {
+        btn.classList.remove('btn-primary', 'btn-success', 'btn-warning', 'btn-danger');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    const activeBtn = document.querySelector(`[onclick="setOperation('${operation}')"]`);
+    if (activeBtn) {
+        activeBtn.classList.remove('btn-outline-primary');
+        switch(operation) {
+            case 'add':
+                activeBtn.classList.add('btn-primary');
+                break;
+            case 'subtract':
+                activeBtn.classList.add('btn-success');
+                break;
+            case 'multiply':
+                activeBtn.classList.add('btn-warning');
+                break;
+            case 'divide':
+                activeBtn.classList.add('btn-danger');
+                break;
+        }
+    }
 }
 
 function calculate() {
@@ -79,7 +112,7 @@ function calculate() {
     document.getElementById('result').textContent = 'Calculating...';
     
     // Call the API
-    fetch(`/api/add?numbers=${numbers.join(',')}`)
+    fetch(`/api/calculate?numbers=${numbers.join(',')}&operation=${currentOperation}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -89,11 +122,18 @@ function calculate() {
             
             // Display the result with animation
             const resultElement = document.getElementById('result');
-            resultElement.textContent = `Sum: ${data.result}`;
+            const operationSymbol = getOperationSymbol(data.operation);
+            const expression = numbers.join(` ${operationSymbol} `);
+            
+            resultElement.innerHTML = `
+                <div class="expression">${expression}</div>
+                <div class="result mt-2">= ${data.result}</div>
+            `;
+            
             resultElement.classList.add('bg-success', 'text-white');
             
             // Add to history
-            addToHistory(numbers, data.result);
+            addToHistory(numbers, data.result, data.operation);
             
             // Remove animation after 2 seconds
             setTimeout(() => {
@@ -106,11 +146,22 @@ function calculate() {
         });
 }
 
-function addToHistory(numbers, sum) {
+function getOperationSymbol(operation) {
+    switch(operation) {
+        case 'add': return '+';
+        case 'subtract': return '-';
+        case 'multiply': return '×';
+        case 'divide': return '÷';
+        default: return '+';
+    }
+}
+
+function addToHistory(numbers, result, operation) {
     // Create history item
     const historyItem = {
         numbers: [...numbers],
-        sum: sum,
+        result: result,
+        operation: operation,
         timestamp: new Date()
     };
     
@@ -141,11 +192,12 @@ function updateHistoryDisplay() {
         historyItem.className = 'history-item';
         
         const timeString = item.timestamp.toLocaleTimeString();
-        const expression = item.numbers.join(' + ');
+        const operationSymbol = getOperationSymbol(item.operation);
+        const expression = item.numbers.join(` ${operationSymbol} `);
         
         historyItem.innerHTML = `
             <div class="d-flex justify-content-between">
-                <span>${expression} = <strong>${item.sum}</strong></span>
+                <span>${expression} = <strong>${item.result}</strong></span>
                 <small class="text-muted">${timeString}</small>
             </div>
         `;
@@ -154,7 +206,8 @@ function updateHistoryDisplay() {
     });
 }
 
-// Initialize the history display on page load
+// Initialize the history display and set default operation on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateHistoryDisplay();
+    setOperation('add');
 });
