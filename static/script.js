@@ -3,6 +3,36 @@ let calculationHistory = [];
 let currentOperation = 'add';
 let previousResult = null;
 let isNewCalculation = true;
+let currentMode = 'simple'; // 'simple' or 'complex'
+let expressionBuilder = '';
+
+function switchMode(mode) {
+    currentMode = mode;
+    const simpleSection = document.getElementById('simpleSection');
+    const complexSection = document.getElementById('complexSection');
+    const modeButtons = document.querySelectorAll('.mode-btn');
+    
+    modeButtons.forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    document.querySelector(`[onclick="switchMode('${mode}')"]`).classList.remove('btn-outline-primary');
+    document.querySelector(`[onclick="switchMode('${mode}')"]`).classList.add('btn-primary');
+    
+    if (mode === 'simple') {
+        simpleSection.classList.remove('d-none');
+        complexSection.classList.add('d-none');
+        document.getElementById('currentOperation').textContent = 'Add';
+    } else {
+        simpleSection.classList.add('d-none');
+        complexSection.classList.remove('d-none');
+        updateExpressionDisplay();
+    }
+    
+    // Reset for new mode
+    startNewCalculation();
+}
 
 function addInput() {
     inputCount++;
@@ -19,11 +49,7 @@ function addInput() {
     document.getElementById('number-inputs').appendChild(inputGroup);
     
     if (inputCount === 3) {
-        const alertElement = document.getElementById('notificationAlert');
-        alertElement.classList.remove('d-none');
-        setTimeout(() => {
-            alertElement.classList.add('d-none');
-        }, 3000);
+        showNotification('You\'ve added a third number!', 'info');
     }
 }
 
@@ -32,13 +58,11 @@ function removeInput(button) {
     inputGroup.remove();
     inputCount--;
     
-    // Update the placeholders for remaining inputs
     const inputs = document.querySelectorAll('#number-inputs input');
     inputs.forEach((input, index) => {
         input.placeholder = `Number ${index + 1}`;
     });
     
-    // Disable remove buttons if we have only 2 inputs left
     if (inputCount <= 2) {
         const removeButtons = document.querySelectorAll('.btn-remove');
         removeButtons.forEach(btn => btn.disabled = true);
@@ -46,10 +70,17 @@ function removeInput(button) {
 }
 
 function resetCalculator() {
+    if (currentMode === 'simple') {
+        resetSimpleCalculator();
+    } else {
+        resetComplexCalculator();
+    }
+}
+
+function resetSimpleCalculator() {
     const numberInputs = document.getElementById('number-inputs');
     numberInputs.innerHTML = '';
     
-    // Add two default inputs
     for (let i = 1; i <= 2; i++) {
         const inputGroup = document.createElement('div');
         inputGroup.className = 'input-group mb-2';
@@ -64,24 +95,44 @@ function resetCalculator() {
         numberInputs.appendChild(inputGroup);
     }
     
-    // Reset counters and state
     inputCount = 2;
     previousResult = null;
     isNewCalculation = true;
-    
-    // Clear result display but keep operation
     document.getElementById('result').innerHTML = '';
     document.getElementById('currentOperation').textContent = 'Add';
     
-    // Reset all input fields
     const inputs = document.querySelectorAll('#number-inputs input');
     inputs.forEach(input => input.value = '');
+}
+
+function resetComplexCalculator() {
+    expressionBuilder = '';
+    previousResult = null;
+    isNewCalculation = true;
+    updateExpressionDisplay();
+    document.getElementById('complexResult').innerHTML = '';
+}
+
+function startNewCalculation() {
+    isNewCalculation = true;
+    previousResult = null;
+    
+    if (currentMode === 'simple') {
+        const inputs = document.querySelectorAll('#number-inputs input');
+        inputs.forEach(input => input.value = '');
+        document.getElementById('result').innerHTML = '';
+        document.getElementById('currentOperation').textContent = 'Add';
+        setOperation('add');
+    } else {
+        expressionBuilder = '';
+        updateExpressionDisplay();
+        document.getElementById('complexResult').innerHTML = '';
+    }
 }
 
 function setOperation(operation) {
     currentOperation = operation;
     
-    // Update operation display
     const operationNames = {
         'add': 'Add',
         'subtract': 'Subtract', 
@@ -90,7 +141,6 @@ function setOperation(operation) {
     };
     document.getElementById('currentOperation').textContent = operationNames[operation];
     
-    // Update button styles to show active operation
     const buttons = document.querySelectorAll('.operation-btn');
     buttons.forEach(btn => {
         btn.classList.remove('btn-primary', 'btn-success', 'btn-warning', 'btn-danger');
@@ -117,33 +167,109 @@ function setOperation(operation) {
     }
 }
 
-function calculate() {
+// Complex Calculator Functions
+function appendToExpression(value) {
+    if (isNewCalculation && previousResult === null) {
+        expressionBuilder = '';
+        isNewCalculation = false;
+    }
+    
+    // If we have a previous result and starting new expression, use it
+    if (previousResult !== null && expressionBuilder === '') {
+        expressionBuilder = previousResult.toString();
+    }
+    
+    expressionBuilder += value;
+    updateExpressionDisplay();
+}
+
+function clearExpression() {
+    expressionBuilder = '';
+    updateExpressionDisplay();
+    document.getElementById('complexResult').innerHTML = '';
+}
+
+function backspaceExpression() {
+    expressionBuilder = expressionBuilder.slice(0, -1);
+    updateExpressionDisplay();
+}
+
+function updateExpressionDisplay() {
+    const display = document.getElementById('expressionDisplay');
+    if (expressionBuilder === '') {
+        display.textContent = 'Enter expression...';
+        display.classList.add('text-muted');
+    } else {
+        display.textContent = expressionBuilder;
+        display.classList.remove('text-muted');
+    }
+}
+
+function calculateComplex() {
+    if (!expressionBuilder) {
+        showNotification('Please enter an expression', 'warning');
+        return;
+    }
+    
+    const resultElement = document.getElementById('complexResult');
+    resultElement.innerHTML = '<div class="text-muted">Calculating...</div>';
+    
+    fetch('/api/calculate/complex', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            expression: expressionBuilder
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            resultElement.innerHTML = `<div class="text-danger">${data.error}</div>`;
+            return;
+        }
+        
+        resultElement.innerHTML = `
+            <div class="expression text-muted mb-1">${data.expression}</div>
+            <div class="result fs-3 fw-bold text-primary">= ${data.result}</div>
+        `;
+        
+        // Store result for continuation
+        previousResult = data.result;
+        isNewCalculation = false;
+        
+        addToHistory([], data.result, 'complex', data.expression);
+    })
+    .catch(error => {
+        resultElement.innerHTML = '<div class="text-danger">Error calculating</div>';
+        console.error(error);
+    });
+}
+
+function calculateSimple() {
     const inputs = document.querySelectorAll('#number-inputs input');
     const numbers = Array.from(inputs)
         .map(input => parseFloat(input.value))
-        .filter(num => !isNaN(num)); // Only include valid numbers
+        .filter(num => !isNaN(num));
     
     if (numbers.length === 0) {
         document.getElementById('result').textContent = 'Please enter at least one number';
         return;
     }
     
-    // Show loading state
     const resultElement = document.getElementById('result');
     resultElement.innerHTML = '<div class="text-muted">Calculating...</div>';
     
-    // Prepare API parameters
     const params = new URLSearchParams({
         numbers: numbers.join(','),
         operation: currentOperation
     });
     
-    // Include previous result if this is a continuation
     if (previousResult !== null && !isNewCalculation) {
         params.append('previous_result', previousResult);
     }
     
-    // Call the API
     fetch(`/api/calculate?${params}`)
         .then(response => response.json())
         .then(data => {
@@ -152,15 +278,12 @@ function calculate() {
                 return;
             }
             
-            // Display the result with animation
             const operationSymbol = getOperationSymbol(data.operation);
-            
             let expressionDisplay;
+            
             if (previousResult !== null && !isNewCalculation) {
-                // Show continuation expression
                 expressionDisplay = `(${previousResult}) ${operationSymbol} ${numbers.join(` ${operationSymbol} `)}`;
             } else {
-                // Show new expression
                 expressionDisplay = data.expression;
             }
             
@@ -173,19 +296,13 @@ function calculate() {
                 }
             `;
             
-            resultElement.classList.add('bg-light');
-            
-            // Store result for next operation and mark as continuation
             previousResult = data.result;
             isNewCalculation = false;
             
-            // Add to history
             addToHistory(numbers, data.result, data.operation, expressionDisplay);
             
-            // Clear input fields for next numbers but keep operation
             const numberInputs = document.querySelectorAll('#number-inputs input');
             numberInputs.forEach(input => input.value = '');
-            
         })
         .catch(error => {
             resultElement.innerHTML = '<div class="text-danger">Error calculating</div>';
@@ -193,14 +310,12 @@ function calculate() {
         });
 }
 
-function startNewCalculation() {
-    isNewCalculation = true;
-    previousResult = null;
-    const inputs = document.querySelectorAll('#number-inputs input');
-    inputs.forEach(input => input.value = '');
-    document.getElementById('result').innerHTML = '';
-    document.getElementById('currentOperation').textContent = 'Add';
-    setOperation('add');
+function calculate() {
+    if (currentMode === 'simple') {
+        calculateSimple();
+    } else {
+        calculateComplex();
+    }
 }
 
 function getOperationSymbol(operation) {
@@ -214,25 +329,22 @@ function getOperationSymbol(operation) {
 }
 
 function addToHistory(numbers, result, operation, expression) {
-    // Create history item
     const historyItem = {
         numbers: [...numbers],
         result: result,
         operation: operation,
         expression: expression,
         timestamp: new Date(),
-        isContinuation: previousResult !== null && !isNewCalculation
+        isContinuation: previousResult !== null && !isNewCalculation,
+        mode: currentMode
     };
     
-    // Add to beginning of history array
     calculationHistory.unshift(historyItem);
     
-    // Keep only last 10 history items
     if (calculationHistory.length > 10) {
         calculationHistory.pop();
     }
     
-    // Update history display
     updateHistoryDisplay();
 }
 
@@ -258,13 +370,15 @@ function updateHistoryDisplay() {
         }
         
         const timeString = item.timestamp.toLocaleTimeString();
+        const modeBadge = item.mode === 'complex' ? '<span class="badge bg-purple me-1">Complex</span>' : '<span class="badge bg-blue me-1">Simple</span>';
         
         historyItem.innerHTML = `
             <div class="d-flex justify-content-between align-items-start">
                 <div class="flex-grow-1">
-                    <div class="expression small text-muted">${item.expression}</div>
+                    ${modeBadge}
+                    ${item.isContinuation ? '<span class="badge bg-info me-1">Continued</span>' : ''}
+                    <div class="expression small text-muted mt-1">${item.expression}</div>
                     <div class="result fw-bold">= ${item.result}</div>
-                    ${item.isContinuation ? '<small class="text-info"><i class="fas fa-link me-1"></i>Continued</small>' : ''}
                 </div>
                 <small class="text-muted ms-2">${timeString}</small>
             </div>
@@ -274,8 +388,23 @@ function updateHistoryDisplay() {
     });
 }
 
+function showNotification(message, type = 'info') {
+    const alertElement = document.getElementById('notificationAlert');
+    alertElement.className = `alert alert-${type} alert-notification alert-dismissible fade show mx-auto`;
+    alertElement.innerHTML = `
+        <i class="fas fa-${type === 'info' ? 'info-circle' : type === 'warning' ? 'exclamation-triangle' : 'check-circle'} me-2"></i>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    alertElement.classList.remove('d-none');
+    
+    setTimeout(() => {
+        alertElement.classList.add('d-none');
+    }, 3000);
+}
+
 // Initialize the calculator on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateHistoryDisplay();
     setOperation('add');
+    switchMode('simple');
 });
