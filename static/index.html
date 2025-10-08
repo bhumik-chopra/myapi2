@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CNH - Enhanced Calculator</title>
+    <title>CNH - Advanced Calculator</title>
     <link rel="icon" href="data:,">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -22,7 +22,7 @@
         }
         
         .calculator {
-            max-width: 600px;
+            max-width: 700px;
             margin: 20px auto;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             border-radius: 12px;
@@ -42,10 +42,6 @@
             transition: all 0.3s ease;
         }
         
-        .input-group:hover {
-            transform: translateX(5px);
-        }
-        
         .btn-remove {
             opacity: 0.7;
             transition: all 0.2s ease;
@@ -57,7 +53,7 @@
         }
         
         .alert-notification {
-            max-width: 600px;
+            max-width: 700px;
             border-radius: 10px;
             animation: slideIn 0.5s ease;
         }
@@ -118,6 +114,29 @@
             padding: 5px 15px;
             font-weight: bold;
         }
+        
+        .complex-btn {
+            height: 50px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        
+        .bg-purple {
+            background-color: #6f42c1 !important;
+        }
+        
+        .bg-blue {
+            background-color: #0d6efd !important;
+        }
+        
+        .expression-display {
+            min-height: 60px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            background: white;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+        }
     </style>
 </head>
 <body>
@@ -127,86 +146,194 @@
         
         <!-- Alert Notification -->
         <div id="notificationAlert" class="alert alert-info d-none alert-notification alert-dismissible fade show mx-auto">
-            <i class="fas fa-info-circle me-2"></i>You've added a third number!
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <i class="fas fa-info-circle me-2"></i>Notification
         </div>
 
         <!-- Calculator -->
         <div class="calculator bg-white p-4 rounded">
-            <h1 class="text-center mb-4 text-primary"><i class="fas fa-calculator me-2"></i>Enhanced Calculator</h1>
+            <h1 class="text-center mb-4 text-primary"><i class="fas fa-calculator me-2"></i>Advanced Calculator</h1>
             
-            <!-- Current Operation Display -->
-            <div class="row mb-3">
+            <!-- Mode Selection -->
+            <div class="row mb-4">
                 <div class="col-12 text-center">
-                    <div class="current-operation d-inline-block px-3 py-1 mb-3">
-                        <i class="fas fa-play me-1"></i>
-                        Current Operation: <span id="currentOperation">Add</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Operation Selection -->
-            <div class="row mb-3">
-                <div class="col-12">
-                    <label class="form-label fw-bold">Select Operation:</label>
-                    <div class="d-flex gap-2 flex-wrap mb-3">
-                        <button onclick="setOperation('add')" class="btn btn-primary operation-btn flex-fill">
-                            <i class="fas fa-plus me-1"></i> Add
+                    <div class="btn-group" role="group">
+                        <button onclick="switchMode('simple')" class="btn btn-primary mode-btn">
+                            <i class="fas fa-calculator me-1"></i> Simple Calculator
                         </button>
-                        <button onclick="setOperation('subtract')" class="btn btn-outline-primary operation-btn flex-fill">
-                            <i class="fas fa-minus me-1"></i> Subtract
-                        </button>
-                        <button onclick="setOperation('multiply')" class="btn btn-outline-primary operation-btn flex-fill">
-                            <i class="fas fa-times me-1"></i> Multiply
-                        </button>
-                        <button onclick="setOperation('divide')" class="btn btn-outline-primary operation-btn flex-fill">
-                            <i class="fas fa-divide me-1"></i> Divide
+                        <button onclick="switchMode('complex')" class="btn btn-outline-primary mode-btn">
+                            <i class="fas fa-brain me-1"></i> Complex Expressions
                         </button>
                     </div>
                 </div>
             </div>
-            
-            <!-- Number Inputs -->
-            <div class="mb-3">
-                <label class="form-label fw-bold">Enter Numbers:</label>
-                <div id="number-inputs">
-                    <div class="input-group mb-2">
-                        <input type="number" class="form-control" placeholder="Number 1">
-                        <button class="btn btn-outline-danger btn-remove" type="button" disabled>
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="input-group mb-2">
-                        <input type="number" class="form-control" placeholder="Number 2">
-                        <button class="btn btn-outline-danger btn-remove" type="button" disabled>
-                            <i class="fas fa-times"></i>
-                        </button>
+
+            <!-- Simple Calculator Section -->
+            <div id="simpleSection">
+                <!-- Current Operation Display -->
+                <div class="row mb-3">
+                    <div class="col-12 text-center">
+                        <div class="current-operation d-inline-block px-3 py-1 mb-3">
+                            <i class="fas fa-play me-1"></i>
+                            Current Operation: <span id="currentOperation">Add</span>
+                        </div>
                     </div>
                 </div>
+                
+                <!-- Operation Selection -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Select Operation:</label>
+                        <div class="d-flex gap-2 flex-wrap mb-3">
+                            <button onclick="setOperation('add')" class="btn btn-primary operation-btn flex-fill">
+                                <i class="fas fa-plus me-1"></i> Add
+                            </button>
+                            <button onclick="setOperation('subtract')" class="btn btn-outline-primary operation-btn flex-fill">
+                                <i class="fas fa-minus me-1"></i> Subtract
+                            </button>
+                            <button onclick="setOperation('multiply')" class="btn btn-outline-primary operation-btn flex-fill">
+                                <i class="fas fa-times me-1"></i> Multiply
+                            </button>
+                            <button onclick="setOperation('divide')" class="btn btn-outline-primary operation-btn flex-fill">
+                                <i class="fas fa-divide me-1"></i> Divide
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Number Inputs -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Enter Numbers:</label>
+                    <div id="number-inputs">
+                        <div class="input-group mb-2">
+                            <input type="number" class="form-control" placeholder="Number 1">
+                            <button class="btn btn-outline-danger btn-remove" type="button" disabled>
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="input-group mb-2">
+                            <input type="number" class="form-control" placeholder="Number 2">
+                            <button class="btn btn-outline-danger btn-remove" type="button" disabled>
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="d-flex gap-2 mb-3">
+                    <button onclick="addInput()" class="btn btn-outline-primary flex-grow-1">
+                        <i class="fas fa-plus me-1"></i> Add Number
+                    </button>
+                    <button onclick="startNewCalculation()" class="btn btn-outline-warning">
+                        <i class="fas fa-plus-circle me-1"></i> New
+                    </button>
+                    <button onclick="resetCalculator()" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+                
+                <!-- Calculate Button -->
+                <button onclick="calculate()" class="btn btn-success w-100 pulse mb-3">
+                    <i class="fas fa-calculator me-1"></i> Calculate
+                </button>
+                
+                <!-- Result Display -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Result:</label>
+                    <div id="result" class="result-box p-3 text-center"></div>
+                </div>
             </div>
-            
-            <!-- Action Buttons -->
-            <div class="d-flex gap-2 mb-3">
-                <button onclick="addInput()" class="btn btn-outline-primary flex-grow-1">
-                    <i class="fas fa-plus me-1"></i> Add Number
+
+            <!-- Complex Calculator Section -->
+            <div id="complexSection" class="d-none">
+                <!-- Expression Display -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Expression:</label>
+                    <div id="expressionDisplay" class="expression-display p-3 mb-3 text-muted">
+                        Enter expression...
+                    </div>
+                </div>
+                
+                <!-- Number Pad -->
+                <div class="row mb-3">
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('7')" class="btn btn-outline-secondary w-100 complex-btn">7</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('8')" class="btn btn-outline-secondary w-100 complex-btn">8</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('9')" class="btn btn-outline-secondary w-100 complex-btn">9</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('+')" class="btn btn-outline-warning w-100 complex-btn">+</button>
+                    </div>
+                    
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('4')" class="btn btn-outline-secondary w-100 complex-btn">4</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('5')" class="btn btn-outline-secondary w-100 complex-btn">5</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('6')" class="btn btn-outline-secondary w-100 complex-btn">6</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('-')" class="btn btn-outline-warning w-100 complex-btn">-</button>
+                    </div>
+                    
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('1')" class="btn btn-outline-secondary w-100 complex-btn">1</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('2')" class="btn btn-outline-secondary w-100 complex-btn">2</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('3')" class="btn btn-outline-secondary w-100 complex-btn">3</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('*')" class="btn btn-outline-warning w-100 complex-btn">×</button>
+                    </div>
+                    
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('0')" class="btn btn-outline-secondary w-100 complex-btn">0</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('.')" class="btn btn-outline-secondary w-100 complex-btn">.</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('/')" class="btn btn-outline-warning w-100 complex-btn">÷</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression('(')" class="btn btn-outline-info w-100 complex-btn">(</button>
+                    </div>
+                    
+                    <div class="col-3 mb-2">
+                        <button onclick="appendToExpression(')')" class="btn btn-outline-info w-100 complex-btn">)</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="backspaceExpression()" class="btn btn-outline-danger w-100 complex-btn">
+                            <i class="fas fa-backspace"></i>
+                        </button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="clearExpression()" class="btn btn-outline-danger w-100 complex-btn">C</button>
+                    </div>
+                    <div class="col-3 mb-2">
+                        <button onclick="startNewCalculation()" class="btn btn-outline-warning w-100 complex-btn">New</button>
+                    </div>
+                </div>
+                
+                <!-- Calculate Button -->
+                <button onclick="calculate()" class="btn btn-success w-100 pulse mb-3">
+                    <i class="fas fa-equals me-1"></i> Calculate Expression
                 </button>
-                <button onclick="startNewCalculation()" class="btn btn-outline-warning">
-                    <i class="fas fa-plus-circle me-1"></i> New
-                </button>
-                <button onclick="resetCalculator()" class="btn btn-outline-secondary">
-                    <i class="fas fa-redo"></i>
-                </button>
-            </div>
-            
-            <!-- Calculate Button -->
-            <button onclick="calculate()" class="btn btn-success w-100 pulse mb-3">
-                <i class="fas fa-calculator me-1"></i> Calculate
-            </button>
-            
-            <!-- Result Display -->
-            <div class="mb-3">
-                <label class="form-label fw-bold">Result:</label>
-                <div id="result" class="result-box p-3 text-center"></div>
+                
+                <!-- Result Display -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Result:</label>
+                    <div id="complexResult" class="result-box p-3 text-center"></div>
+                </div>
             </div>
             
             <!-- Calculation History -->
