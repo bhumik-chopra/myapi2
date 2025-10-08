@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CNH - Enhanced Adder</title>
+    <title>CNH - Enhanced Calculator</title>
     <link rel="icon" href="data:,">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -78,7 +78,7 @@
         }
         
         .result-box {
-            min-height: 60px;
+            min-height: 80px;
             transition: all 0.3s ease;
             border-radius: 8px;
             background-color: #f8f9fa;
@@ -90,10 +90,22 @@
             margin: 5px 0;
             font-size: 0.9rem;
         }
+        
+        .expression {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .operation-btn {
+            transition: all 0.2s ease;
+        }
+        
+        .operation-btn:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
-    <!-- The rest of your HTML content remains unchanged -->
     <div class="container py-5">
         <!-- Brand Logo -->
         <img src="/static/images/download.png" alt="Brand Logo" class="d-block mx-auto mb-4 brand-logo">
@@ -106,7 +118,28 @@
 
         <!-- Calculator -->
         <div class="calculator bg-white p-4 rounded">
-            <h1 class="text-center mb-4 text-primary"><i class="fas fa-calculator me-2"></i>Enhanced Adder</h1>
+            <h1 class="text-center mb-4 text-primary"><i class="fas fa-calculator me-2"></i>Enhanced Calculator</h1>
+            
+            <!-- Operation Selection -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <label class="form-label">Select Operation:</label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button onclick="setOperation('add')" class="btn btn-primary operation-btn flex-fill">
+                            <i class="fas fa-plus me-1"></i> Add
+                        </button>
+                        <button onclick="setOperation('subtract')" class="btn btn-outline-primary operation-btn flex-fill">
+                            <i class="fas fa-minus me-1"></i> Subtract
+                        </button>
+                        <button onclick="setOperation('multiply')" class="btn btn-outline-primary operation-btn flex-fill">
+                            <i class="fas fa-times me-1"></i> Multiply
+                        </button>
+                        <button onclick="setOperation('divide')" class="btn btn-outline-primary operation-btn flex-fill">
+                            <i class="fas fa-divide me-1"></i> Divide
+                        </button>
+                    </div>
+                </div>
+            </div>
             
             <div id="number-inputs">
                 <div class="input-group mb-2">
@@ -133,7 +166,7 @@
             </div>
             
             <button onclick="calculate()" class="btn btn-success w-100 pulse">
-                <i class="fas fa-calculator me-1"></i> Calculate Sum
+                <i class="fas fa-calculator me-1"></i> Calculate
             </button>
             
             <div id="result" class="result-box mt-4 p-3 text-center fs-4"></div>
