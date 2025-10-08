@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import re
+import os 
 import operator
 
 app = FastAPI()
@@ -212,3 +213,4 @@ def generate_expression(numbers, operation):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
