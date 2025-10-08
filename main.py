@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import os
 
 app = FastAPI()
@@ -14,6 +14,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 class CalculationRequest(BaseModel):
     numbers: List[float]
     operation: str
+    previous_result: Optional[float] = None
 
 # Root route to serve an HTML UI
 @app.get("/", response_class=HTMLResponse)
@@ -23,9 +24,13 @@ async def serve_ui(request: Request):
 
 # GET method to perform calculations via query parameter
 @app.get("/api/calculate")
-async def calculate_numbers_get(numbers: str, operation: str = "add"):
+async def calculate_numbers_get(numbers: str, operation: str = "add", previous_result: Optional[float] = None):
     try:
         num_list = [float(n) for n in numbers.split(",") if n]
+        
+        # If there's a previous result, use it as the first number
+        if previous_result is not None:
+            num_list = [previous_result] + num_list
         
         if len(num_list) < 2:
             return {"error": "Please provide at least 2 numbers"}
@@ -47,7 +52,11 @@ async def calculate_numbers_get(numbers: str, operation: str = "add"):
         else:
             return {"error": "Invalid operation"}
             
-        return {"result": result, "operation": operation}
+        return {
+            "result": result, 
+            "operation": operation,
+            "expression": generate_expression(num_list, operation)
+        }
         
     except ValueError:
         return {"error": "Invalid input. Please provide numbers separated by commas"}
@@ -57,6 +66,11 @@ async def calculate_numbers_get(numbers: str, operation: str = "add"):
 async def calculate_numbers_post(request: CalculationRequest):
     numbers = request.numbers
     operation = request.operation
+    previous_result = request.previous_result
+    
+    # If there's a previous result, use it as the first number
+    if previous_result is not None:
+        numbers = [previous_result] + numbers
     
     if len(numbers) < 2:
         return {"error": "Please provide at least 2 numbers"}
@@ -78,7 +92,21 @@ async def calculate_numbers_post(request: CalculationRequest):
     else:
         return {"error": "Invalid operation"}
         
-    return {"result": result, "operation": operation}
+    return {
+        "result": result, 
+        "operation": operation,
+        "expression": generate_expression(numbers, operation)
+    }
+
+def generate_expression(numbers, operation):
+    symbols = {
+        'add': '+',
+        'subtract': '-',
+        'multiply': '×',
+        'divide': '÷'
+    }
+    symbol = symbols.get(operation, '+')
+    return f" {symbol} ".join(str(num) for num in numbers)
 
 # Run the server
 if __name__ == "__main__":
