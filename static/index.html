@@ -22,7 +22,7 @@
         }
         
         .calculator {
-            max-width: 500px;
+            max-width: 600px;
             margin: 20px auto;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             border-radius: 12px;
@@ -57,7 +57,7 @@
         }
         
         .alert-notification {
-            max-width: 500px;
+            max-width: 600px;
             border-radius: 10px;
             animation: slideIn 0.5s ease;
         }
@@ -78,22 +78,25 @@
         }
         
         .result-box {
-            min-height: 80px;
+            min-height: 100px;
             transition: all 0.3s ease;
             border-radius: 8px;
             background-color: #f8f9fa;
+            border: 2px dashed #dee2e6;
         }
         
         .history-item {
-            border-left: 3px solid #0d6efd;
-            padding-left: 10px;
-            margin: 5px 0;
-            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            border-radius: 6px;
+        }
+        
+        .history-item:hover {
+            background-color: #f8f9fa;
         }
         
         .expression {
-            font-size: 0.9rem;
-            opacity: 0.8;
+            font-size: 0.85rem;
+            word-break: break-all;
         }
         
         .operation-btn {
@@ -102,6 +105,18 @@
         
         .operation-btn:hover {
             transform: translateY(-2px);
+        }
+        
+        .continuation-badge {
+            font-size: 0.7rem;
+        }
+        
+        .current-operation {
+            background: linear-gradient(45deg, #0d6efd, #6f42c1);
+            color: white;
+            border-radius: 20px;
+            padding: 5px 15px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -120,11 +135,21 @@
         <div class="calculator bg-white p-4 rounded">
             <h1 class="text-center mb-4 text-primary"><i class="fas fa-calculator me-2"></i>Enhanced Calculator</h1>
             
+            <!-- Current Operation Display -->
+            <div class="row mb-3">
+                <div class="col-12 text-center">
+                    <div class="current-operation d-inline-block px-3 py-1 mb-3">
+                        <i class="fas fa-play me-1"></i>
+                        Current Operation: <span id="currentOperation">Add</span>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Operation Selection -->
             <div class="row mb-3">
                 <div class="col-12">
-                    <label class="form-label">Select Operation:</label>
-                    <div class="d-flex gap-2 flex-wrap">
+                    <label class="form-label fw-bold">Select Operation:</label>
+                    <div class="d-flex gap-2 flex-wrap mb-3">
                         <button onclick="setOperation('add')" class="btn btn-primary operation-btn flex-fill">
                             <i class="fas fa-plus me-1"></i> Add
                         </button>
@@ -141,40 +166,53 @@
                 </div>
             </div>
             
-            <div id="number-inputs">
-                <div class="input-group mb-2">
-                    <input type="number" class="form-control" placeholder="Number 1">
-                    <button class="btn btn-outline-danger btn-remove" type="button" disabled>
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="input-group mb-2">
-                    <input type="number" class="form-control" placeholder="Number 2">
-                    <button class="btn btn-outline-danger btn-remove" type="button" disabled>
-                        <i class="fas fa-times"></i>
-                    </button>
+            <!-- Number Inputs -->
+            <div class="mb-3">
+                <label class="form-label fw-bold">Enter Numbers:</label>
+                <div id="number-inputs">
+                    <div class="input-group mb-2">
+                        <input type="number" class="form-control" placeholder="Number 1">
+                        <button class="btn btn-outline-danger btn-remove" type="button" disabled>
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="input-group mb-2">
+                        <input type="number" class="form-control" placeholder="Number 2">
+                        <button class="btn btn-outline-danger btn-remove" type="button" disabled>
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             
+            <!-- Action Buttons -->
             <div class="d-flex gap-2 mb-3">
                 <button onclick="addInput()" class="btn btn-outline-primary flex-grow-1">
                     <i class="fas fa-plus me-1"></i> Add Number
                 </button>
-                <button onclick="resetInputs()" class="btn btn-outline-secondary">
+                <button onclick="startNewCalculation()" class="btn btn-outline-warning">
+                    <i class="fas fa-plus-circle me-1"></i> New
+                </button>
+                <button onclick="resetCalculator()" class="btn btn-outline-secondary">
                     <i class="fas fa-redo"></i>
                 </button>
             </div>
             
-            <button onclick="calculate()" class="btn btn-success w-100 pulse">
+            <!-- Calculate Button -->
+            <button onclick="calculate()" class="btn btn-success w-100 pulse mb-3">
                 <i class="fas fa-calculator me-1"></i> Calculate
             </button>
             
-            <div id="result" class="result-box mt-4 p-3 text-center fs-4"></div>
+            <!-- Result Display -->
+            <div class="mb-3">
+                <label class="form-label fw-bold">Result:</label>
+                <div id="result" class="result-box p-3 text-center"></div>
+            </div>
             
             <!-- Calculation History -->
             <div class="mt-4" id="history-container">
                 <h5 class="border-bottom pb-2"><i class="fas fa-history me-2"></i>Calculation History</h5>
-                <div id="history"></div>
+                <div id="history" class="mt-2"></div>
             </div>
         </div>
     </div>
