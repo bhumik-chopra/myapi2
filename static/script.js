@@ -1,6 +1,8 @@
 let inputCount = 2;
 let calculationHistory = [];
 let currentOperation = 'add';
+let previousResult = null;
+let isNewCalculation = true;
 
 function addInput() {
     inputCount++;
@@ -43,7 +45,7 @@ function removeInput(button) {
     }
 }
 
-function resetInputs() {
+function resetCalculator() {
     const numberInputs = document.getElementById('number-inputs');
     numberInputs.innerHTML = '';
     
@@ -62,15 +64,31 @@ function resetInputs() {
         numberInputs.appendChild(inputGroup);
     }
     
-    // Reset counter and result
+    // Reset counters and state
     inputCount = 2;
-    document.getElementById('result').textContent = '';
-    currentOperation = 'add';
-    document.getElementById('operationSelect').value = 'add';
+    previousResult = null;
+    isNewCalculation = true;
+    
+    // Clear result display but keep operation
+    document.getElementById('result').innerHTML = '';
+    document.getElementById('currentOperation').textContent = 'Add';
+    
+    // Reset all input fields
+    const inputs = document.querySelectorAll('#number-inputs input');
+    inputs.forEach(input => input.value = '');
 }
 
 function setOperation(operation) {
     currentOperation = operation;
+    
+    // Update operation display
+    const operationNames = {
+        'add': 'Add',
+        'subtract': 'Subtract', 
+        'multiply': 'Multiply',
+        'divide': 'Divide'
+    };
+    document.getElementById('currentOperation').textContent = operationNames[operation];
     
     // Update button styles to show active operation
     const buttons = document.querySelectorAll('.operation-btn');
@@ -101,49 +119,88 @@ function setOperation(operation) {
 
 function calculate() {
     const inputs = document.querySelectorAll('#number-inputs input');
-    const numbers = Array.from(inputs).map(input => parseFloat(input.value) || 0);
+    const numbers = Array.from(inputs)
+        .map(input => parseFloat(input.value))
+        .filter(num => !isNaN(num)); // Only include valid numbers
     
-    if (numbers.length < 2) {
-        document.getElementById('result').textContent = 'Please enter at least 2 numbers';
+    if (numbers.length === 0) {
+        document.getElementById('result').textContent = 'Please enter at least one number';
         return;
     }
     
     // Show loading state
-    document.getElementById('result').textContent = 'Calculating...';
+    const resultElement = document.getElementById('result');
+    resultElement.innerHTML = '<div class="text-muted">Calculating...</div>';
+    
+    // Prepare API parameters
+    const params = new URLSearchParams({
+        numbers: numbers.join(','),
+        operation: currentOperation
+    });
+    
+    // Include previous result if this is a continuation
+    if (previousResult !== null && !isNewCalculation) {
+        params.append('previous_result', previousResult);
+    }
     
     // Call the API
-    fetch(`/api/calculate?numbers=${numbers.join(',')}&operation=${currentOperation}`)
+    fetch(`/api/calculate?${params}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                document.getElementById('result').textContent = data.error;
+                resultElement.innerHTML = `<div class="text-danger">${data.error}</div>`;
                 return;
             }
             
             // Display the result with animation
-            const resultElement = document.getElementById('result');
             const operationSymbol = getOperationSymbol(data.operation);
-            const expression = numbers.join(` ${operationSymbol} `);
+            
+            let expressionDisplay;
+            if (previousResult !== null && !isNewCalculation) {
+                // Show continuation expression
+                expressionDisplay = `(${previousResult}) ${operationSymbol} ${numbers.join(` ${operationSymbol} `)}`;
+            } else {
+                // Show new expression
+                expressionDisplay = data.expression;
+            }
             
             resultElement.innerHTML = `
-                <div class="expression">${expression}</div>
-                <div class="result mt-2">= ${data.result}</div>
+                <div class="expression text-muted mb-1">${expressionDisplay}</div>
+                <div class="result fs-3 fw-bold text-primary">= ${data.result}</div>
+                ${previousResult !== null && !isNewCalculation ? 
+                    '<div class="continuation-badge mt-1"><span class="badge bg-info">Continued</span></div>' : 
+                    '<div class="continuation-badge mt-1"><span class="badge bg-success">New Calculation</span></div>'
+                }
             `;
             
-            resultElement.classList.add('bg-success', 'text-white');
+            resultElement.classList.add('bg-light');
+            
+            // Store result for next operation and mark as continuation
+            previousResult = data.result;
+            isNewCalculation = false;
             
             // Add to history
-            addToHistory(numbers, data.result, data.operation);
+            addToHistory(numbers, data.result, data.operation, expressionDisplay);
             
-            // Remove animation after 2 seconds
-            setTimeout(() => {
-                resultElement.classList.remove('bg-success', 'text-white');
-            }, 2000);
+            // Clear input fields for next numbers but keep operation
+            const numberInputs = document.querySelectorAll('#number-inputs input');
+            numberInputs.forEach(input => input.value = '');
+            
         })
         .catch(error => {
-            document.getElementById('result').textContent = 'Error calculating';
+            resultElement.innerHTML = '<div class="text-danger">Error calculating</div>';
             console.error(error);
         });
+}
+
+function startNewCalculation() {
+    isNewCalculation = true;
+    previousResult = null;
+    const inputs = document.querySelectorAll('#number-inputs input');
+    inputs.forEach(input => input.value = '');
+    document.getElementById('result').innerHTML = '';
+    document.getElementById('currentOperation').textContent = 'Add';
+    setOperation('add');
 }
 
 function getOperationSymbol(operation) {
@@ -156,20 +213,22 @@ function getOperationSymbol(operation) {
     }
 }
 
-function addToHistory(numbers, result, operation) {
+function addToHistory(numbers, result, operation, expression) {
     // Create history item
     const historyItem = {
         numbers: [...numbers],
         result: result,
         operation: operation,
-        timestamp: new Date()
+        expression: expression,
+        timestamp: new Date(),
+        isContinuation: previousResult !== null && !isNewCalculation
     };
     
     // Add to beginning of history array
     calculationHistory.unshift(historyItem);
     
-    // Keep only last 5 history items
-    if (calculationHistory.length > 5) {
+    // Keep only last 10 history items
+    if (calculationHistory.length > 10) {
         calculationHistory.pop();
     }
     
@@ -181,24 +240,33 @@ function updateHistoryDisplay() {
     const historyElement = document.getElementById('history');
     
     if (calculationHistory.length === 0) {
-        historyElement.innerHTML = '<p class="text-muted">No calculations yet</p>';
+        historyElement.innerHTML = '<p class="text-muted text-center">No calculations yet</p>';
         return;
     }
     
     historyElement.innerHTML = '';
     
-    calculationHistory.forEach(item => {
+    calculationHistory.forEach((item, index) => {
         const historyItem = document.createElement('div');
-        historyItem.className = 'history-item';
+        historyItem.className = `history-item ${index === 0 ? 'border-primary' : ''} p-2 mb-2 rounded`;
+        
+        if (index === 0) {
+            historyItem.style.backgroundColor = '#f8f9fa';
+            historyItem.style.borderLeft = '4px solid #0d6efd';
+        } else {
+            historyItem.style.borderLeft = '4px solid #6c757d';
+        }
         
         const timeString = item.timestamp.toLocaleTimeString();
-        const operationSymbol = getOperationSymbol(item.operation);
-        const expression = item.numbers.join(` ${operationSymbol} `);
         
         historyItem.innerHTML = `
-            <div class="d-flex justify-content-between">
-                <span>${expression} = <strong>${item.result}</strong></span>
-                <small class="text-muted">${timeString}</small>
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="expression small text-muted">${item.expression}</div>
+                    <div class="result fw-bold">= ${item.result}</div>
+                    ${item.isContinuation ? '<small class="text-info"><i class="fas fa-link me-1"></i>Continued</small>' : ''}
+                </div>
+                <small class="text-muted ms-2">${timeString}</small>
             </div>
         `;
         
@@ -206,7 +274,7 @@ function updateHistoryDisplay() {
     });
 }
 
-// Initialize the history display and set default operation on page load
+// Initialize the calculator on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateHistoryDisplay();
     setOperation('add');
