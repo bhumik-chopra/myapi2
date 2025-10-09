@@ -3,15 +3,26 @@ let calculationHistory = [];
 let currentOperation = 'add';
 let previousResult = null;
 let isNewCalculation = true;
-let currentMode = 'simple'; // 'simple' or 'complex'
+let currentMode = 'simple'; // 'simple', 'complex', 'scientific', 'matrix'
 let expressionBuilder = '';
+let matrixSize = 2;
+let matrixA = [];
+let matrixB = [];
 
 function switchMode(mode) {
     currentMode = mode;
-    const simpleSection = document.getElementById('simpleSection');
-    const complexSection = document.getElementById('complexSection');
-    const modeButtons = document.querySelectorAll('.mode-btn');
+    const sections = ['simpleSection', 'complexSection', 'scientificSection', 'matrixSection'];
     
+    // Hide all sections
+    sections.forEach(section => {
+        document.getElementById(section).classList.add('d-none');
+    });
+    
+    // Show current section
+    document.getElementById(mode + 'Section').classList.remove('d-none');
+    
+    // Update mode buttons
+    const modeButtons = document.querySelectorAll('.mode-btn');
     modeButtons.forEach(btn => {
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-outline-primary');
@@ -20,20 +31,16 @@ function switchMode(mode) {
     document.querySelector(`[onclick="switchMode('${mode}')"]`).classList.remove('btn-outline-primary');
     document.querySelector(`[onclick="switchMode('${mode}')"]`).classList.add('btn-primary');
     
-    if (mode === 'simple') {
-        simpleSection.classList.remove('d-none');
-        complexSection.classList.add('d-none');
-        document.getElementById('currentOperation').textContent = 'Add';
-    } else {
-        simpleSection.classList.add('d-none');
-        complexSection.classList.remove('d-none');
-        updateExpressionDisplay();
-    }
-    
     // Reset for new mode
     startNewCalculation();
+    
+    // Initialize matrix if in matrix mode
+    if (mode === 'matrix') {
+        initializeMatrices();
+    }
 }
 
+// Simple Calculator Functions
 function addInput() {
     inputCount++;
     const inputGroup = document.createElement('div');
@@ -72,8 +79,12 @@ function removeInput(button) {
 function resetCalculator() {
     if (currentMode === 'simple') {
         resetSimpleCalculator();
-    } else {
+    } else if (currentMode === 'complex') {
         resetComplexCalculator();
+    } else if (currentMode === 'scientific') {
+        resetScientificCalculator();
+    } else if (currentMode === 'matrix') {
+        resetMatrixCalculator();
     }
 }
 
@@ -113,6 +124,16 @@ function resetComplexCalculator() {
     document.getElementById('complexResult').innerHTML = '';
 }
 
+function resetScientificCalculator() {
+    document.getElementById('scientificInput').value = '';
+    document.getElementById('scientificResult').innerHTML = '';
+}
+
+function resetMatrixCalculator() {
+    initializeMatrices();
+    document.getElementById('matrixResult').innerHTML = '';
+}
+
 function startNewCalculation() {
     isNewCalculation = true;
     previousResult = null;
@@ -123,10 +144,13 @@ function startNewCalculation() {
         document.getElementById('result').innerHTML = '';
         document.getElementById('currentOperation').textContent = 'Add';
         setOperation('add');
-    } else {
+    } else if (currentMode === 'complex') {
         expressionBuilder = '';
         updateExpressionDisplay();
         document.getElementById('complexResult').innerHTML = '';
+    } else if (currentMode === 'scientific') {
+        document.getElementById('scientificInput').value = '';
+        document.getElementById('scientificResult').innerHTML = '';
     }
 }
 
@@ -174,12 +198,15 @@ function appendToExpression(value) {
         isNewCalculation = false;
     }
     
-    // If we have a previous result and starting new expression, use it
     if (previousResult !== null && expressionBuilder === '') {
         expressionBuilder = previousResult.toString();
     }
     
-    expressionBuilder += value;
+    let displayValue = value;
+    if (value === '*') displayValue = '×';
+    if (value === '/') displayValue = '÷';
+    
+    expressionBuilder += displayValue;
     updateExpressionDisplay();
 }
 
@@ -214,13 +241,61 @@ function calculateComplex() {
     const resultElement = document.getElementById('complexResult');
     resultElement.innerHTML = '<div class="text-muted">Calculating...</div>';
     
+    let backendExpression = expressionBuilder.replace(/×/g, '*').replace(/÷/g, '/');
+    
     fetch('/api/calculate/complex', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            expression: expressionBuilder
+            expression: backendExpression
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            resultElement.innerHTML = `<div class="text-danger">${data.error}</div>`;
+            return;
+        }
+        
+        resultElement.innerHTML = `
+            <div class="expression text-muted mb-1">${expressionBuilder}</div>
+            <div class="result fs-3 fw-bold text-primary">= ${data.result}</div>
+        `;
+        
+        previousResult = data.result;
+        isNewCalculation = false;
+        
+        addToHistory([], data.result, 'complex', expressionBuilder);
+    })
+    .catch(error => {
+        resultElement.innerHTML = '<div class="text-danger">Error calculating</div>';
+        console.error(error);
+    });
+}
+
+// Scientific Calculator Functions
+function calculateScientific(operation) {
+    const input = document.getElementById('scientificInput');
+    const number = parseFloat(input.value);
+    
+    if (isNaN(number)) {
+        showNotification('Please enter a valid number', 'warning');
+        return;
+    }
+    
+    const resultElement = document.getElementById('scientificResult');
+    resultElement.innerHTML = '<div class="text-muted">Calculating...</div>';
+    
+    fetch('/api/calculate/scientific', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            number: number,
+            operation: operation
         })
     })
     .then(response => response.json())
@@ -235,16 +310,141 @@ function calculateComplex() {
             <div class="result fs-3 fw-bold text-primary">= ${data.result}</div>
         `;
         
-        // Store result for continuation
-        previousResult = data.result;
-        isNewCalculation = false;
-        
-        addToHistory([], data.result, 'complex', data.expression);
+        addToHistory([number], data.result, 'scientific', data.expression);
     })
     .catch(error => {
         resultElement.innerHTML = '<div class="text-danger">Error calculating</div>';
         console.error(error);
     });
+}
+
+// Matrix Calculator Functions
+function initializeMatrices() {
+    matrixSize = parseInt(document.getElementById('matrixSize').value) || 2;
+    matrixA = [];
+    matrixB = [];
+    
+    // Initialize matrices with zeros
+    for (let i = 0; i < matrixSize; i++) {
+        matrixA[i] = [];
+        matrixB[i] = [];
+        for (let j = 0; j < matrixSize; j++) {
+            matrixA[i][j] = 0;
+            matrixB[i][j] = 0;
+        }
+    }
+    
+    renderMatrices();
+}
+
+function renderMatrices() {
+    const matrixAContainer = document.getElementById('matrixA');
+    const matrixBContainer = document.getElementById('matrixB');
+    
+    matrixAContainer.innerHTML = '';
+    matrixBContainer.innerHTML = '';
+    
+    for (let i = 0; i < matrixSize; i++) {
+        const rowA = document.createElement('div');
+        const rowB = document.createElement('div');
+        rowA.className = 'matrix-row';
+        rowB.className = 'matrix-row';
+        
+        for (let j = 0; j < matrixSize; j++) {
+            const inputA = document.createElement('input');
+            const inputB = document.createElement('input');
+            
+            inputA.type = 'number';
+            inputB.type = 'number';
+            inputA.className = 'matrix-input';
+            inputB.className = 'matrix-input';
+            inputA.value = matrixA[i][j];
+            inputB.value = matrixB[i][j];
+            inputA.placeholder = `A[${i+1},${j+1}]`;
+            inputB.placeholder = `B[${i+1},${j+1}]`;
+            
+            inputA.addEventListener('input', (e) => {
+                matrixA[i][j] = parseFloat(e.target.value) || 0;
+            });
+            
+            inputB.addEventListener('input', (e) => {
+                matrixB[i][j] = parseFloat(e.target.value) || 0;
+            });
+            
+            rowA.appendChild(inputA);
+            rowB.appendChild(inputB);
+        }
+        
+        matrixAContainer.appendChild(rowA);
+        matrixBContainer.appendChild(rowB);
+    }
+}
+
+function calculateMatrix(operation) {
+    const resultElement = document.getElementById('matrixResult');
+    resultElement.innerHTML = '<div class="text-muted">Calculating...</div>';
+    
+    fetch('/api/calculate/matrix', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            matrix1: matrixA,
+            matrix2: matrixB,
+            operation: operation
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            resultElement.innerHTML = `<div class="text-danger">${data.error}</div>`;
+            return;
+        }
+        
+        let resultHTML = `
+            <div class="expression text-muted mb-2">${data.expression}</div>
+            <div class="result fw-bold text-primary mb-2">Result:</div>
+        `;
+        
+        if (typeof data.result === 'number') {
+            // Scalar result (determinant)
+            resultHTML += `<div class="fs-4">${data.result}</div>`;
+        } else {
+            // Matrix result
+            resultHTML += '<div class="matrix-result">';
+            data.result.forEach(row => {
+                resultHTML += '<div class="matrix-row">';
+                row.forEach(cell => {
+                    resultHTML += `<span class="matrix-cell">${cell.toFixed(2)}</span>`;
+                });
+                resultHTML += '</div>';
+            });
+            resultHTML += '</div>';
+        }
+        
+        resultElement.innerHTML = resultHTML;
+        
+        addToHistory([], data.result, 'matrix', data.expression);
+    })
+    .catch(error => {
+        resultElement.innerHTML = '<div class="text-danger">Error calculating</div>';
+        console.error(error);
+    });
+}
+
+function changeMatrixSize() {
+    initializeMatrices();
+    document.getElementById('matrixResult').innerHTML = '';
+}
+
+// Common Functions
+function calculate() {
+    if (currentMode === 'simple') {
+        calculateSimple();
+    } else if (currentMode === 'complex') {
+        calculateComplex();
+    }
 }
 
 function calculateSimple() {
@@ -310,14 +510,6 @@ function calculateSimple() {
         });
 }
 
-function calculate() {
-    if (currentMode === 'simple') {
-        calculateSimple();
-    } else {
-        calculateComplex();
-    }
-}
-
 function getOperationSymbol(operation) {
     switch(operation) {
         case 'add': return '+';
@@ -370,15 +562,20 @@ function updateHistoryDisplay() {
         }
         
         const timeString = item.timestamp.toLocaleTimeString();
-        const modeBadge = item.mode === 'complex' ? '<span class="badge bg-purple me-1">Complex</span>' : '<span class="badge bg-blue me-1">Simple</span>';
+        const modeBadges = {
+            'simple': '<span class="badge bg-blue me-1">Simple</span>',
+            'complex': '<span class="badge bg-purple me-1">Complex</span>',
+            'scientific': '<span class="badge bg-success me-1">Scientific</span>',
+            'matrix': '<span class="badge bg-warning me-1">Matrix</span>'
+        };
         
         historyItem.innerHTML = `
             <div class="d-flex justify-content-between align-items-start">
                 <div class="flex-grow-1">
-                    ${modeBadge}
+                    ${modeBadges[item.mode] || ''}
                     ${item.isContinuation ? '<span class="badge bg-info me-1">Continued</span>' : ''}
                     <div class="expression small text-muted mt-1">${item.expression}</div>
-                    <div class="result fw-bold">= ${item.result}</div>
+                    <div class="result fw-bold">= ${typeof item.result === 'object' ? 'Matrix Result' : item.result}</div>
                 </div>
                 <small class="text-muted ms-2">${timeString}</small>
             </div>
