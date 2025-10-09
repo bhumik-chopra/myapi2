@@ -7,7 +7,14 @@ import re
 import operator
 import os
 import math
-import numpy as np
+
+# Try to import numpy, fall back to manual implementation if not available
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    print("NumPy not available, using manual matrix operations")
 
 app = FastAPI()
 
@@ -132,12 +139,17 @@ async def calculate_scientific(request: ScientificRequest):
             'square': lambda x: x**2,
             'cube': lambda x: x**3,
             'exp': math.exp,
-            'factorial': math.factorial,
+            'factorial': factorial,
             'abs': abs,
             'ceil': math.ceil,
             'floor': math.floor,
             'radians': math.radians,
-            'degrees': math.degrees
+            'degrees': math.degrees,
+            'pi': lambda x: math.pi,
+            'e': lambda x: math.e,
+            'sin_rad': math.sin,
+            'cos_rad': math.cos,
+            'tan_rad': math.tan
         }
         
         if operation not in operations:
@@ -153,12 +165,22 @@ async def calculate_scientific(request: ScientificRequest):
         if operation == 'sqrt' and number < 0:
             return {"error": "Square root requires non-negative number"}
         
-        result = operations[operation](number)
+        # Convert degrees to radians for trigonometric functions (except *_rad functions)
+        if operation in ['sin', 'cos', 'tan']:
+            number = math.radians(number)
+        
+        if operation in ['pi', 'e']:
+            result = operations[operation](0)  # These don't need the input number
+        else:
+            result = operations[operation](number)
         
         operation_symbols = {
-            'sin': f'sin({number})',
-            'cos': f'cos({number})',
-            'tan': f'tan({number})',
+            'sin': f'sin({request.number}°)',
+            'cos': f'cos({request.number}°)',
+            'tan': f'tan({request.number}°)',
+            'sin_rad': f'sin({request.number} rad)',
+            'cos_rad': f'cos({request.number} rad)',
+            'tan_rad': f'tan({request.number} rad)',
             'log': f'log({number})',
             'ln': f'ln({number})',
             'sqrt': f'√({number})',
@@ -169,8 +191,10 @@ async def calculate_scientific(request: ScientificRequest):
             'abs': f'|{number}|',
             'ceil': f'ceil({number})',
             'floor': f'floor({number})',
-            'radians': f'radians({number})',
-            'degrees': f'degrees({number})'
+            'radians': f'radians({number}°)',
+            'degrees': f'degrees({number}rad)',
+            'pi': 'π',
+            'e': 'e'
         }
         
         return {
@@ -190,82 +214,194 @@ async def calculate_matrix_operation(request: MatrixOperationRequest):
         matrix2 = request.matrix2
         operation = request.operation
         
-        # Convert to numpy arrays
-        A = np.array(matrix1)
-        B = np.array(matrix2)
-        
-        if operation == 'add':
-            if A.shape != B.shape:
-                return {"error": "Matrices must have same dimensions for addition"}
-            result = (A + B).tolist()
-            expression = "Matrix Addition"
-            
-        elif operation == 'subtract':
-            if A.shape != B.shape:
-                return {"error": "Matrices must have same dimensions for subtraction"}
-            result = (A - B).tolist()
-            expression = "Matrix Subtraction"
-            
-        elif operation == 'multiply':
-            if A.shape[1] != B.shape[0]:
-                return {"error": "Number of columns in first matrix must equal number of rows in second matrix"}
-            result = (A @ B).tolist()
-            expression = "Matrix Multiplication"
-            
-        elif operation == 'elementwise_multiply':
-            if A.shape != B.shape:
-                return {"error": "Matrices must have same dimensions for element-wise multiplication"}
-            result = (A * B).tolist()
-            expression = "Element-wise Multiplication"
-            
-        elif operation == 'determinant1':
-            if A.shape[0] != A.shape[1]:
-                return {"error": "Matrix must be square for determinant calculation"}
-            result = float(np.linalg.det(A))
-            expression = f"det(A) = {result}"
-            
-        elif operation == 'determinant2':
-            if B.shape[0] != B.shape[1]:
-                return {"error": "Matrix must be square for determinant calculation"}
-            result = float(np.linalg.det(B))
-            expression = f"det(B) = {result}"
-            
-        elif operation == 'inverse1':
-            if A.shape[0] != A.shape[1]:
-                return {"error": "Matrix must be square for inverse calculation"}
-            if np.linalg.det(A) == 0:
-                return {"error": "Matrix is singular, cannot compute inverse"}
-            result = np.linalg.inv(A).tolist()
-            expression = "Inverse of Matrix A"
-            
-        elif operation == 'inverse2':
-            if B.shape[0] != B.shape[1]:
-                return {"error": "Matrix must be square for inverse calculation"}
-            if np.linalg.det(B) == 0:
-                return {"error": "Matrix is singular, cannot compute inverse"}
-            result = np.linalg.inv(B).tolist()
-            expression = "Inverse of Matrix B"
-            
-        elif operation == 'transpose1':
-            result = A.T.tolist()
-            expression = "Transpose of Matrix A"
-            
-        elif operation == 'transpose2':
-            result = B.T.tolist()
-            expression = "Transpose of Matrix B"
-            
+        if NUMPY_AVAILABLE:
+            return await _calculate_matrix_numpy(matrix1, matrix2, operation)
         else:
-            return {"error": f"Unsupported matrix operation: {operation}"}
-        
-        return {
-            "result": result,
-            "expression": expression,
-            "type": "matrix",
-            "operation": operation
-        }
+            return await _calculate_matrix_manual(matrix1, matrix2, operation)
         
     except Exception as e:
         return {"error": f"Error in matrix operation: {str(e)}"}
+
+async def _calculate_matrix_numpy(matrix1, matrix2, operation):
+    """Matrix operations using NumPy"""
+    # Convert to numpy arrays
+    A = np.array(matrix1, dtype=float)
+    B = np.array(matrix2, dtype=float)
+    
+    if operation == 'add':
+        if A.shape != B.shape:
+            return {"error": "Matrices must have same dimensions for addition"}
+        result = (A + B).tolist()
+        expression = "Matrix Addition"
+        
+    elif operation == 'subtract':
+        if A.shape != B.shape:
+            return {"error": "Matrices must have same dimensions for subtraction"}
+        result = (A - B).tolist()
+        expression = "Matrix Subtraction"
+        
+    elif operation == 'multiply':
+        if A.shape[1] != B.shape[0]:
+            return {"error": "Number of columns in first matrix must equal number of rows in second matrix"}
+        result = (A @ B).tolist()
+        expression = "Matrix Multiplication"
+        
+    elif operation == 'elementwise_multiply':
+        if A.shape != B.shape:
+            return {"error": "Matrices must have same dimensions for element-wise multiplication"}
+        result = (A * B).tolist()
+        expression = "Element-wise Multiplication"
+        
+    elif operation == 'determinant1':
+        if A.shape[0] != A.shape[1]:
+            return {"error": "Matrix must be square for determinant calculation"}
+        result = float(np.linalg.det(A))
+        expression = f"det(A) = {result:.6f}"
+        
+    elif operation == 'determinant2':
+        if B.shape[0] != B.shape[1]:
+            return {"error": "Matrix must be square for determinant calculation"}
+        result = float(np.linalg.det(B))
+        expression = f"det(B) = {result:.6f}"
+        
+    elif operation == 'inverse1':
+        if A.shape[0] != A.shape[1]:
+            return {"error": "Matrix must be square for inverse calculation"}
+        try:
+            result = np.linalg.inv(A).tolist()
+            expression = "Inverse of Matrix A"
+        except np.linalg.LinAlgError:
+            return {"error": "Matrix A is singular, cannot compute inverse"}
+        
+    elif operation == 'inverse2':
+        if B.shape[0] != B.shape[1]:
+            return {"error": "Matrix must be square for inverse calculation"}
+        try:
+            result = np.linalg.inv(B).tolist()
+            expression = "Inverse of Matrix B"
+        except np.linalg.LinAlgError:
+            return {"error": "Matrix B is singular, cannot compute inverse"}
+        
+    elif operation == 'transpose1':
+        result = A.T.tolist()
+        expression = "Transpose of Matrix A"
+        
+    elif operation == 'transpose2':
+        result = B.T.tolist()
+        expression = "Transpose of Matrix B"
+        
+    else:
+        return {"error": f"Unsupported matrix operation: {operation}"}
+    
+    return {
+        "result": result,
+        "expression": expression,
+        "type": "matrix",
+        "operation": operation
+    }
+
+async def _calculate_matrix_manual(matrix1, matrix2, operation):
+    """Matrix operations using manual implementation (fallback)"""
+    if operation == 'add':
+        if len(matrix1) != len(matrix2) or len(matrix1[0]) != len(matrix2[0]):
+            return {"error": "Matrices must have same dimensions for addition"}
+        result = matrix_add(matrix1, matrix2)
+        expression = "Matrix Addition"
+        
+    elif operation == 'subtract':
+        if len(matrix1) != len(matrix2) or len(matrix1[0]) != len(matrix2[0]):
+            return {"error": "Matrices must have same dimensions for subtraction"}
+        result = matrix_subtract(matrix1, matrix2)
+        expression = "Matrix Subtraction"
+        
+    elif operation == 'multiply':
+        if len(matrix1[0]) != len(matrix2):
+            return {"error": "Number of columns in first matrix must equal number of rows in second matrix"}
+        result = matrix_multiply(matrix1, matrix2)
+        expression = "Matrix Multiplication"
+        
+    elif operation == 'elementwise_multiply':
+        if len(matrix1) != len(matrix2) or len(matrix1[0]) != len(matrix2[0]):
+            return {"error": "Matrices must have same dimensions for element-wise multiplication"}
+        result = matrix_elementwise_multiply(matrix1, matrix2)
+        expression = "Element-wise Multiplication"
+        
+    elif operation == 'determinant1':
+        if len(matrix1) != len(matrix1[0]):
+            return {"error": "Matrix must be square for determinant calculation"}
+        result = matrix_determinant(matrix1)
+        expression = f"det(A) = {result}"
+        
+    elif operation == 'determinant2':
+        if len(matrix2) != len(matrix2[0]):
+            return {"error": "Matrix must be square for determinant calculation"}
+        result = matrix_determinant(matrix2)
+        expression = f"det(B) = {result}"
+        
+    elif operation == 'transpose1':
+        result = matrix_transpose(matrix1)
+        expression = "Transpose of Matrix A"
+        
+    elif operation == 'transpose2':
+        result = matrix_transpose(matrix2)
+        expression = "Transpose of Matrix B"
+        
+    else:
+        return {"error": f"Unsupported matrix operation: {operation}"}
+    
+    return {
+        "result": result,
+        "expression": expression,
+        "type": "matrix",
+        "operation": operation
+    }
+
+# Manual matrix operations implementation
+def matrix_add(A, B):
+    return [[A[i][j] + B[i][j] for j in range(len(A[0]))] for i in range(len(A))]
+
+def matrix_subtract(A, B):
+    return [[A[i][j] - B[i][j] for j in range(len(A[0]))] for i in range(len(A))]
+
+def matrix_multiply(A, B):
+    result = [[0 for _ in range(len(B[0]))] for _ in range(len(A))]
+    for i in range(len(A)):
+        for j in range(len(B[0])):
+            for k in range(len(B)):
+                result[i][j] += A[i][k] * B[k][j]
+    return result
+
+def matrix_elementwise_multiply(A, B):
+    return [[A[i][j] * B[i][j] for j in range(len(A[0]))] for i in range(len(A))]
+
+def matrix_transpose(A):
+    return [[A[j][i] for j in range(len(A))] for i in range(len(A[0]))]
+
+def matrix_determinant(A):
+    n = len(A)
+    if n == 1:
+        return A[0][0]
+    elif n == 2:
+        return A[0][0] * A[1][1] - A[0][1] * A[1][0]
+    elif n == 3:
+        return (A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) -
+                A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) +
+                A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]))
+    else:
+        # For larger matrices, use a simple recursive approach
+        det = 0
+        for j in range(n):
+            minor = [[A[i][k] for k in range(n) if k != j] for i in range(1, n)]
+            det += ((-1) ** j) * A[0][j] * matrix_determinant(minor)
+        return det
+
+def factorial(n):
+    if n == 0:
+        return 1
+    result = 1
+    for i in range(1, int(n) + 1):
+        result *= i
+    return result
 
 def evaluate_expression(expression):
     """Safely evaluate mathematical expression with operator precedence"""
