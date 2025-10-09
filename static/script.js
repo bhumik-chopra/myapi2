@@ -53,7 +53,7 @@ function addInput() {
     inputGroup.className = 'input-group mb-2';
     
     inputGroup.innerHTML = `
-        <input type="number" class="form-control" placeholder="Number ${inputCount}">
+        <input type="number" class="form-control" placeholder="Number ${inputCount}" step="any">
         <button class="btn btn-outline-danger btn-remove" type="button" onclick="removeInput(this)">
             <i class="fas fa-times"></i>
         </button>
@@ -103,7 +103,7 @@ function resetSimpleCalculator() {
         inputGroup.className = 'input-group mb-2';
         
         inputGroup.innerHTML = `
-            <input type="number" class="form-control" placeholder="Number ${i}">
+            <input type="number" class="form-control" placeholder="Number ${i}" step="any">
             <button class="btn btn-outline-danger btn-remove" type="button" disabled>
                 <i class="fas fa-times"></i>
             </button>
@@ -423,6 +423,8 @@ function renderMatrices() {
             inputB.value = matrixB[i][j];
             inputA.placeholder = `A[${i+1},${j+1}]`;
             inputB.placeholder = `B[${i+1},${j+1}]`;
+            inputA.step = 'any';
+            inputB.step = 'any';
             
             inputA.addEventListener('input', (e) => {
                 matrixA[i][j] = parseFloat(e.target.value) || 0;
