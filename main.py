@@ -4,15 +4,17 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import re
-import os 
 import operator
+import os
+import math
+import numpy as np
 
 app = FastAPI()
 
 # Serve static files (e.g., HTML, CSS, JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Pydantic model for POST request
+# Pydantic models
 class CalculationRequest(BaseModel):
     expression: str
 
@@ -20,13 +22,34 @@ class ComplexCalculationRequest(BaseModel):
     numbers: List[float]
     operations: List[str]
 
+class MatrixOperationRequest(BaseModel):
+    matrix1: List[List[float]]
+    matrix2: List[List[float]]
+    operation: str
+
+class ScientificRequest(BaseModel):
+    number: float
+    operation: str
+
 # Root route to serve an HTML UI
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui(request: Request):
-    with open(os.path.join("static", "index.html")) as f:
-        return HTMLResponse(content=f.read())
+    static_dir = "static"
+    index_file = os.path.join(static_dir, "index.html")
+    
+    if not os.path.exists(static_dir):
+        return HTMLResponse(content="<h1>Static directory not found</h1>", status_code=404)
+    
+    if not os.path.exists(index_file):
+        return HTMLResponse(content="<h1>index.html not found in static directory</h1>", status_code=404)
+    
+    try:
+        with open(index_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except Exception as e:
+        return HTMLResponse(content=f"<h1>Error reading file: {str(e)}</h1>", status_code=500)
 
-# Simple calculation endpoint (for backward compatibility)
+# Simple calculation endpoint
 @app.get("/api/calculate")
 async def calculate_numbers_get(numbers: str, operation: str = "add", previous_result: Optional[float] = None):
     try:
@@ -73,6 +96,9 @@ async def calculate_complex_expression(request: CalculationRequest):
         if not expression:
             return {"error": "Please provide an expression"}
         
+        # Replace UI symbols with backend symbols
+        expression = expression.replace('×', '*').replace('÷', '/')
+        
         # Validate expression contains only numbers and allowed operators
         if not re.match(r'^[\d+\-*/().\s]+$', expression):
             return {"error": "Invalid characters in expression"}
@@ -89,56 +115,166 @@ async def calculate_complex_expression(request: CalculationRequest):
     except Exception as e:
         return {"error": f"Error evaluating expression: {str(e)}"}
 
-@app.post("/api/calculate/sequential")
-async def calculate_sequential_operations(request: ComplexCalculationRequest):
+# Scientific operations endpoint
+@app.post("/api/calculate/scientific")
+async def calculate_scientific(request: ScientificRequest):
     try:
-        numbers = request.numbers
-        operations = request.operations
+        number = request.number
+        operation = request.operation
         
-        if len(numbers) < 2:
-            return {"error": "Please provide at least 2 numbers"}
+        operations = {
+            'sin': math.sin,
+            'cos': math.cos,
+            'tan': math.tan,
+            'log': math.log10,
+            'ln': math.log,
+            'sqrt': math.sqrt,
+            'square': lambda x: x**2,
+            'cube': lambda x: x**3,
+            'exp': math.exp,
+            'factorial': math.factorial,
+            'abs': abs,
+            'ceil': math.ceil,
+            'floor': math.floor,
+            'radians': math.radians,
+            'degrees': math.degrees
+        }
         
-        if len(operations) != len(numbers) - 1:
-            return {"error": "Number of operations should be one less than numbers"}
+        if operation not in operations:
+            return {"error": f"Unsupported scientific operation: {operation}"}
         
-        result = numbers[0]
-        expression_parts = [str(numbers[0])]
+        # Handle special cases
+        if operation == 'factorial' and (number < 0 or number != int(number)):
+            return {"error": "Factorial requires non-negative integer"}
         
-        for i, operation in enumerate(operations):
-            next_num = numbers[i + 1]
+        if operation in ['log', 'ln'] and number <= 0:
+            return {"error": "Logarithm requires positive number"}
+        
+        if operation == 'sqrt' and number < 0:
+            return {"error": "Square root requires non-negative number"}
+        
+        result = operations[operation](number)
+        
+        operation_symbols = {
+            'sin': f'sin({number})',
+            'cos': f'cos({number})',
+            'tan': f'tan({number})',
+            'log': f'log({number})',
+            'ln': f'ln({number})',
+            'sqrt': f'√({number})',
+            'square': f'({number})²',
+            'cube': f'({number})³',
+            'exp': f'e^({number})',
+            'factorial': f'({number})!',
+            'abs': f'|{number}|',
+            'ceil': f'ceil({number})',
+            'floor': f'floor({number})',
+            'radians': f'radians({number})',
+            'degrees': f'degrees({number})'
+        }
+        
+        return {
+            "result": result,
+            "expression": operation_symbols[operation],
+            "type": "scientific"
+        }
+        
+    except Exception as e:
+        return {"error": f"Error in scientific calculation: {str(e)}"}
+
+# Matrix operations endpoint
+@app.post("/api/calculate/matrix")
+async def calculate_matrix_operation(request: MatrixOperationRequest):
+    try:
+        matrix1 = request.matrix1
+        matrix2 = request.matrix2
+        operation = request.operation
+        
+        # Convert to numpy arrays
+        A = np.array(matrix1)
+        B = np.array(matrix2)
+        
+        if operation == 'add':
+            if A.shape != B.shape:
+                return {"error": "Matrices must have same dimensions for addition"}
+            result = (A + B).tolist()
+            expression = "Matrix Addition"
             
-            if operation == 'add':
-                result += next_num
-                expression_parts.append(f" + {next_num}")
-            elif operation == 'subtract':
-                result -= next_num
-                expression_parts.append(f" - {next_num}")
-            elif operation == 'multiply':
-                result *= next_num
-                expression_parts.append(f" × {next_num}")
-            elif operation == 'divide':
-                if next_num == 0:
-                    return {"error": "Division by zero is not allowed"}
-                result /= next_num
-                expression_parts.append(f" ÷ {next_num}")
-            else:
-                return {"error": f"Invalid operation: {operation}"}
-        
-        expression = ''.join(expression_parts)
+        elif operation == 'subtract':
+            if A.shape != B.shape:
+                return {"error": "Matrices must have same dimensions for subtraction"}
+            result = (A - B).tolist()
+            expression = "Matrix Subtraction"
+            
+        elif operation == 'multiply':
+            if A.shape[1] != B.shape[0]:
+                return {"error": "Number of columns in first matrix must equal number of rows in second matrix"}
+            result = (A @ B).tolist()
+            expression = "Matrix Multiplication"
+            
+        elif operation == 'elementwise_multiply':
+            if A.shape != B.shape:
+                return {"error": "Matrices must have same dimensions for element-wise multiplication"}
+            result = (A * B).tolist()
+            expression = "Element-wise Multiplication"
+            
+        elif operation == 'determinant1':
+            if A.shape[0] != A.shape[1]:
+                return {"error": "Matrix must be square for determinant calculation"}
+            result = float(np.linalg.det(A))
+            expression = f"det(A) = {result}"
+            
+        elif operation == 'determinant2':
+            if B.shape[0] != B.shape[1]:
+                return {"error": "Matrix must be square for determinant calculation"}
+            result = float(np.linalg.det(B))
+            expression = f"det(B) = {result}"
+            
+        elif operation == 'inverse1':
+            if A.shape[0] != A.shape[1]:
+                return {"error": "Matrix must be square for inverse calculation"}
+            if np.linalg.det(A) == 0:
+                return {"error": "Matrix is singular, cannot compute inverse"}
+            result = np.linalg.inv(A).tolist()
+            expression = "Inverse of Matrix A"
+            
+        elif operation == 'inverse2':
+            if B.shape[0] != B.shape[1]:
+                return {"error": "Matrix must be square for inverse calculation"}
+            if np.linalg.det(B) == 0:
+                return {"error": "Matrix is singular, cannot compute inverse"}
+            result = np.linalg.inv(B).tolist()
+            expression = "Inverse of Matrix B"
+            
+        elif operation == 'transpose1':
+            result = A.T.tolist()
+            expression = "Transpose of Matrix A"
+            
+        elif operation == 'transpose2':
+            result = B.T.tolist()
+            expression = "Transpose of Matrix B"
+            
+        else:
+            return {"error": f"Unsupported matrix operation: {operation}"}
         
         return {
             "result": result,
             "expression": expression,
-            "type": "sequential"
+            "type": "matrix",
+            "operation": operation
         }
         
     except Exception as e:
-        return {"error": f"Error in sequential calculation: {str(e)}"}
+        return {"error": f"Error in matrix operation: {str(e)}"}
 
 def evaluate_expression(expression):
     """Safely evaluate mathematical expression with operator precedence"""
     # Remove spaces
     expression = expression.replace(' ', '')
+    
+    # Handle negative numbers at the beginning
+    if expression.startswith('-'):
+        expression = '0' + expression
     
     # Handle parentheses first
     while '(' in expression:
@@ -156,6 +292,9 @@ def solve_parentheses(expression):
     """Solve expressions within parentheses"""
     def replace_parentheses(match):
         inner_expr = match.group(1)
+        # Handle negative numbers at the beginning of parentheses
+        if inner_expr.startswith('-'):
+            inner_expr = '0' + inner_expr
         # Solve the inner expression
         inner_expr = solve_operations(inner_expr, ['*', '/'])
         inner_expr = solve_operations(inner_expr, ['+', '-'])
@@ -168,14 +307,13 @@ def solve_parentheses(expression):
 
 def solve_operations(expression, operators):
     """Solve specific operations in expression"""
-    # Pattern to match numbers (including decimals) and operators
+    # Improved pattern to handle negative numbers and consecutive operators
     pattern = r'(-?\d+\.?\d*)([\+\-\*/])(-?\d+\.?\d*)'
     
-    while True:
-        match = re.search(pattern, expression)
-        if not match:
-            break
-            
+    # Find all matches first to avoid infinite loops
+    matches = list(re.finditer(pattern, expression))
+    
+    for match in matches:
         left = float(match.group(1))
         op = match.group(2)
         right = float(match.group(3))
@@ -192,10 +330,9 @@ def solve_operations(expression, operators):
                     raise ValueError("Division by zero")
                 result = left / right
             
-            # Replace the operation with its result
+            # Replace only this specific occurrence
             expression = expression.replace(match.group(0), str(result), 1)
-        else:
-            break
+            break  # Restart after each replacement
     
     return expression
 
@@ -213,4 +350,3 @@ def generate_expression(numbers, operation):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
