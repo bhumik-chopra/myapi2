@@ -12,7 +12,7 @@ app = FastAPI()
 # Serve static files (e.g., HTML, CSS, JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Pydantic models
+# Pydantic models (compatible with v1)
 class CalculationRequest(BaseModel):
     expression: str
 
