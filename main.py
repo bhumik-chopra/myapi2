@@ -4,7 +4,6 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import re
-import operator
 import os
 import math
 
@@ -17,17 +16,13 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 class CalculationRequest(BaseModel):
     expression: str
 
-class ComplexCalculationRequest(BaseModel):
-    numbers: List[float]
-    operations: List[str]
+class ScientificRequest(BaseModel):
+    number: float
+    operation: str
 
 class MatrixOperationRequest(BaseModel):
     matrix1: List[List[float]]
     matrix2: List[List[float]]
-    operation: str
-
-class ScientificRequest(BaseModel):
-    number: float
     operation: str
 
 # Root route to serve an HTML UI
@@ -426,4 +421,5 @@ def generate_expression(numbers, operation):
 # Run the server
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
