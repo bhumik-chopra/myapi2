@@ -3,11 +3,17 @@ let calculationHistory = [];
 let currentOperation = 'add';
 let previousResult = null;
 let isNewCalculation = true;
-let currentMode = 'simple'; // 'simple', 'complex', 'scientific', 'matrix'
+let currentMode = 'simple';
 let expressionBuilder = '';
 let matrixSize = 2;
 let matrixA = [];
 let matrixB = [];
+
+// Initialize calculator
+document.addEventListener('DOMContentLoaded', function() {
+    initializeMatrices();
+    updateHistoryDisplay();
+});
 
 function switchMode(mode) {
     currentMode = mode;
@@ -191,6 +197,57 @@ function setOperation(operation) {
     }
 }
 
+// Main calculate function
+function calculate() {
+    if (currentMode === 'simple') {
+        calculateSimple();
+    } else if (currentMode === 'complex') {
+        calculateComplex();
+    }
+}
+
+// Simple Calculator Calculation
+function calculateSimple() {
+    const inputs = document.querySelectorAll('#number-inputs input');
+    const numbers = Array.from(inputs)
+        .map(input => parseFloat(input.value))
+        .filter(num => !isNaN(num));
+    
+    if (numbers.length < 2) {
+        showNotification('Please enter at least 2 valid numbers', 'warning');
+        return;
+    }
+    
+    const numbersString = numbers.join(',');
+    const url = `/api/calculate?numbers=${numbersString}&operation=${currentOperation}&previous_result=${previousResult || ''}`;
+    
+    const resultElement = document.getElementById('result');
+    resultElement.innerHTML = '<div class="text-muted">Calculating...</div>';
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultElement.innerHTML = `<div class="text-danger">${data.error}</div>`;
+                return;
+            }
+            
+            resultElement.innerHTML = `
+                <div class="expression text-muted mb-1">${data.expression}</div>
+                <div class="result fs-3 fw-bold text-primary">= ${data.result}</div>
+            `;
+            
+            previousResult = data.result;
+            isNewCalculation = false;
+            
+            addToHistory(numbers, data.result, 'simple', data.expression);
+        })
+        .catch(error => {
+            resultElement.innerHTML = '<div class="text-danger">Error calculating</div>';
+            console.error(error);
+        });
+}
+
 // Complex Calculator Functions
 function appendToExpression(value) {
     if (isNewCalculation && previousResult === null) {
@@ -280,7 +337,7 @@ function calculateScientific(operation) {
     const input = document.getElementById('scientificInput');
     const number = parseFloat(input.value);
     
-    if (isNaN(number)) {
+    if (isNaN(number) && !['pi', 'e'].includes(operation)) {
         showNotification('Please enter a valid number', 'warning');
         return;
     }
@@ -294,7 +351,7 @@ function calculateScientific(operation) {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            number: number,
+            number: number || 0,
             operation: operation
         })
     })
@@ -335,6 +392,10 @@ function initializeMatrices() {
     }
     
     renderMatrices();
+}
+
+function changeMatrixSize() {
+    initializeMatrices();
 }
 
 function renderMatrices() {
@@ -423,4 +484,80 @@ function calculateMatrix(operation) {
             resultHTML += '</div>';
         }
         
-        resultElement
+        resultElement.innerHTML = resultHTML;
+        addToHistory([], data.result, 'matrix', data.expression);
+    })
+    .catch(error => {
+        resultElement.innerHTML = '<div class="text-danger">Error calculating matrix</div>';
+        console.error(error);
+    });
+}
+
+// History Functions
+function addToHistory(numbers, result, type, expression) {
+    const historyItem = {
+        id: Date.now(),
+        numbers: numbers,
+        result: result,
+        type: type,
+        expression: expression,
+        timestamp: new Date().toLocaleTimeString()
+    };
+    
+    calculationHistory.unshift(historyItem);
+    if (calculationHistory.length > 10) {
+        calculationHistory.pop();
+    }
+    
+    updateHistoryDisplay();
+}
+
+function updateHistoryDisplay() {
+    const historyContainer = document.getElementById('history');
+    
+    if (calculationHistory.length === 0) {
+        historyContainer.innerHTML = '<div class="text-muted text-center">No calculations yet</div>';
+        return;
+    }
+    
+    historyContainer.innerHTML = calculationHistory.map(item => `
+        <div class="history-item p-2 mb-2 border rounded">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="expression small text-muted">${item.expression}</div>
+                    <div class="result fw-bold">= ${item.result}</div>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-secondary">${item.type}</span>
+                    <div class="text-muted small">${item.timestamp}</div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Utility Functions
+function showNotification(message, type = 'info') {
+    const alert = document.getElementById('notificationAlert');
+    alert.className = `alert alert-${type} alert-notification alert-dismissible fade show mx-auto`;
+    alert.innerHTML = `
+        <i class="fas fa-${getIcon(type)} me-2"></i>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    alert.classList.remove('d-none');
+    
+    // Auto hide after 3 seconds
+    setTimeout(() => {
+        alert.classList.add('d-none');
+    }, 3000);
+}
+
+function getIcon(type) {
+    const icons = {
+        'info': 'info-circle',
+        'success': 'check-circle',
+        'warning': 'exclamation-triangle',
+        'danger': 'times-circle'
+    };
+    return icons[type] || 'info-circle';
+}
