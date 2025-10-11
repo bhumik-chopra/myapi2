@@ -12,7 +12,7 @@ app = FastAPI()
 # Serve static files (e.g., HTML, CSS, JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Pydantic models (compatible with v1)
+# Pydantic models
 class CalculationRequest(BaseModel):
     expression: str
 
@@ -45,12 +45,18 @@ async def serve_ui(request: Request):
 
 # Simple calculation endpoint
 @app.get("/api/calculate")
-async def calculate_numbers_get(numbers: str, operation: str = "add", previous_result: Optional[float] = None):
+async def calculate_numbers_get(numbers: str, operation: str = "add", previous_result: Optional[str] = None):
     try:
-        num_list = [float(n) for n in numbers.split(",") if n]
+        num_list = [float(n) for n in numbers.split(",") if n.strip()]
         
-        if previous_result is not None:
-            num_list = [previous_result] + num_list
+        # Handle previous_result properly
+        if previous_result and previous_result.strip() and previous_result != "null":
+            try:
+                prev_result_float = float(previous_result)
+                num_list = [prev_result_float] + num_list
+            except ValueError:
+                # If previous_result is invalid, just use the current numbers
+                pass
         
         if len(num_list) < 2:
             return {"error": "Please provide at least 2 numbers"}
@@ -80,6 +86,8 @@ async def calculate_numbers_get(numbers: str, operation: str = "add", previous_r
         
     except ValueError:
         return {"error": "Invalid input. Please provide numbers separated by commas"}
+    except Exception as e:
+        return {"error": f"Unexpected error: {str(e)}"}
 
 # Complex expression evaluation endpoint
 @app.post("/api/calculate/complex")
